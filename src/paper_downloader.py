@@ -59,7 +59,7 @@ class ArxivPaperDownloader:
             last_day = date.replace(month=date.month + 1, day=1) - timedelta(days=1)
         return first_day, last_day
     
-    def fetch_papers(self, start_date=None, batch_size=1000):
+    def fetch_papers(self, start_date=None, batch_size=10000):
         if start_date is None:
             start_date = datetime(2024, 12, 31)
             
@@ -95,6 +95,11 @@ class ArxivPaperDownloader:
                     
                     papers = list(client.results(search))
                     print(f"검색된 논문 수: {len(papers)}")
+                    
+                    # 검색 결과가 배치 크기와 같으면 추가 검색 필요
+                    if len(papers) == batch_size:
+                        print("주의: 검색 결과가 배치 크기와 같습니다. 일부 논문이 누락되었을 수 있습니다.")
+                        print("이 경우, 해당 월을 더 작은 기간으로 나누어 검색할 수 있습니다.")
                     
                     if papers:
                         with tqdm(total=len(papers), desc="논문 다운로드", unit="편") as paper_pbar:
