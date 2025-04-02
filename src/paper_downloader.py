@@ -12,6 +12,8 @@ class ArxivPaperDownloader:
         self.base_dir.mkdir(parents=True, exist_ok=True)
         self.total_downloaded = 0
         self.total_errors = 0
+        self.last_search_time = None
+        self.min_search_interval = 3  # 최소 검색 간격 (초)
         
     def download_paper(self, url, filename):
         max_retries = 3
@@ -41,23 +43,49 @@ class ArxivPaperDownloader:
                 time.sleep(2)
         return False
     
+    def wait_for_api_limit(self):
+        if self.last_search_time is not None:
+            elapsed = time.time() - self.last_search_time
+            if elapsed < self.min_search_interval:
+                time.sleep(self.min_search_interval - elapsed)
+        self.last_search_time = time.time()
+    
+    def get_month_range(self, date):
+        # 해당 월의 첫 날과 마지막 날을 반환
+        first_day = date.replace(day=1)
+        if date.month == 12:
+            last_day = date.replace(year=date.year + 1, month=1, day=1) - timedelta(days=1)
+        else:
+            last_day = date.replace(month=date.month + 1, day=1) - timedelta(days=1)
+        return first_day, last_day
+    
     def fetch_papers(self, start_date=None, batch_size=1000):
         if start_date is None:
             start_date = datetime(2024, 12, 31)
             
         current_date = start_date
         
-        with tqdm(desc="전체 진행률", unit="일") as pbar:
-            while True:  # 무한 루프로 변경
+        with tqdm(desc="전체 진행률", unit="월") as pbar:
+            while True:  # 무한 루프
+                first_day, last_day = self.get_month_range(current_date)
+                
                 # 검색 쿼리 설정
                 categories = ['cs.AI', 'cs.CV']
                 query = ' OR '.join(f'cat:{cat}' for cat in categories)
+                query += f' AND submittedDate:[{first_day.strftime("%Y%m%d")}0000 TO {last_day.strftime("%Y%m%d")}2359]'
+                
+                print(f"\n\n=== {first_day.strftime('%Y-%m')} 월 논문 검색 중 ===")
+                print(f"검색 기간: {first_day.strftime('%Y-%m-%d')} ~ {last_day.strftime('%Y-%m-%d')}")
+                print(f"검색 쿼리: {query}")
+                
+                # API 제한 대기
+                self.wait_for_api_limit()
                 
                 # arXiv API 클라이언트 설정
                 client = arxiv.Client()
                 
                 try:
-                    # 한 번에 더 많은 논문을 가져오기
+                    # 논문 검색
                     search = arxiv.Search(
                         query=query,
                         max_results=batch_size,
@@ -65,10 +93,6 @@ class ArxivPaperDownloader:
                         sort_order=arxiv.SortOrder.Descending
                     )
                     
-                    print(f"\n\n=== {current_date.strftime('%Y-%m-%d')} 이후 논문 검색 중 ===")
-                    print(f"검색 쿼리: {query}")
-                    
-                    # 논문 다운로드
                     papers = list(client.results(search))
                     print(f"검색된 논문 수: {len(papers)}")
                     
@@ -106,19 +130,24 @@ class ArxivPaperDownloader:
                     
                 except Exception as e:
                     print(f"검색 중 오류 발생: {e}")
-                    time.sleep(60)
+                    time.sleep(60)  # 오류 발생 시 1분 대기
                     continue
                 
                 print(f"\n=== 진행 상황 ===")
                 print(f"총 다운로드: {self.total_downloaded}개")
                 print(f"총 실패: {self.total_errors}개")
                 
-                current_date -= timedelta(days=30)  # 30일씩 과거로 이동
-                pbar.update(30)
-                time.sleep(3)
+                # 다음 달로 이동
+                if current_date.month == 1:
+                    current_date = current_date.replace(year=current_date.year - 1, month=12)
+                else:
+                    current_date = current_date.replace(month=current_date.month - 1)
+                
+                pbar.update(1)
+                time.sleep(3)  # 다음 달 검색 전 대기
 
 if __name__ == "__main__":
     downloader = ArxivPaperDownloader()
-    # 2024년 12월 31일부터 과거로 이동
+    # 2024년 12월부터 시작
     start_date = datetime(2024, 12, 31)
     downloader.fetch_papers(start_date=start_date) 
