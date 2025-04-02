@@ -43,13 +43,12 @@ class ArxivPaperDownloader:
     
     def fetch_papers(self, start_date=None, batch_size=1000):
         if start_date is None:
-            start_date = datetime(2007, 1, 1)
+            start_date = datetime(2024, 12, 31)
             
         current_date = start_date
-        end_date = datetime.now()
         
         with tqdm(desc="전체 진행률", unit="일") as pbar:
-            while current_date <= end_date:
+            while True:  # 무한 루프로 변경
                 # 검색 쿼리 설정
                 categories = ['cs.AI', 'cs.CV']
                 query = ' OR '.join(f'cat:{cat}' for cat in categories)
@@ -114,7 +113,7 @@ class ArxivPaperDownloader:
                 print(f"총 다운로드: {self.total_downloaded}개")
                 print(f"총 실패: {self.total_errors}개")
                 
-                current_date += timedelta(days=30)  # 30일씩 이동
+                current_date -= timedelta(days=30)  # 30일씩 과거로 이동
                 pbar.update(30)
                 time.sleep(3)
 
