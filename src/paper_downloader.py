@@ -87,11 +87,18 @@ class ArxivPaperDownloader:
         last_completed = self.load_progress()
         if last_completed:
             print(f"이전 진행 상황 발견: {last_completed.strftime('%Y-%m')}까지 완료")
-            # 이전 달부터 시작
+            # 이전 달의 마지막 날로 설정
             if last_completed.month == 1:
-                current_date = last_completed.replace(year=last_completed.year - 1, month=12)
+                current_date = last_completed.replace(year=last_completed.year - 1, month=12, day=31)
             else:
-                current_date = last_completed.replace(month=last_completed.month - 1)
+                # 이전 달의 마지막 날 계산
+                if last_completed.month in [4, 6, 9, 11]:
+                    last_day = 30
+                elif last_completed.month == 2:
+                    last_day = 29 if last_completed.year % 4 == 0 and (last_completed.year % 100 != 0 or last_completed.year % 400 == 0) else 28
+                else:
+                    last_day = 31
+                current_date = last_completed.replace(month=last_completed.month - 1, day=last_day)
         else:
             current_date = start_date
         
@@ -178,9 +185,16 @@ class ArxivPaperDownloader:
                 
                 # Move to previous month
                 if current_date.month == 1:
-                    current_date = current_date.replace(year=current_date.year - 1, month=12)
+                    current_date = current_date.replace(year=current_date.year - 1, month=12, day=31)
                 else:
-                    current_date = current_date.replace(month=current_date.month - 1)
+                    # 이전 달의 마지막 날 계산
+                    if current_date.month in [4, 6, 9, 11]:
+                        last_day = 30
+                    elif current_date.month == 2:
+                        last_day = 29 if current_date.year % 4 == 0 and (current_date.year % 100 != 0 or current_date.year % 400 == 0) else 28
+                    else:
+                        last_day = 31
+                    current_date = current_date.replace(month=current_date.month - 1, day=last_day)
                 
                 pbar.update(1)
                 time.sleep(3)  # 다음 달 검색 전 대기
