@@ -2,6 +2,7 @@ import arxiv
 import os
 import requests
 import time
+import json
 from datetime import datetime, timedelta
 from tqdm import tqdm
 from pathlib import Path
@@ -10,11 +11,30 @@ class ArxivPaperDownloader:
     def __init__(self):
         self.base_dir = Path("data/pdf")
         self.base_dir.mkdir(parents=True, exist_ok=True)
+        self.progress_file = Path("data/progress.json")
         self.total_downloaded = 0
         self.total_errors = 0
         self.last_search_time = None
         self.min_search_interval = 3  # 최소 검색 간격 (초)
         
+    def load_progress(self):
+        if self.progress_file.exists():
+            try:
+                with open(self.progress_file, 'r') as f:
+                    data = json.load(f)
+                    return datetime.fromisoformat(data['last_completed_month'])
+            except Exception as e:
+                print(f"진행 상황 로드 중 오류: {e}")
+        return None
+    
+    def save_progress(self, date):
+        try:
+            self.progress_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(self.progress_file, 'w') as f:
+                json.dump({'last_completed_month': date.isoformat()}, f)
+        except Exception as e:
+            print(f"진행 상황 저장 중 오류: {e}")
+    
     def download_paper(self, url, filename):
         max_retries = 3
         retry_count = 0
@@ -63,7 +83,17 @@ class ArxivPaperDownloader:
         if start_date is None:
             start_date = datetime(2024, 12, 31)
             
-        current_date = start_date
+        # 이전 진행 상황 로드
+        last_completed = self.load_progress()
+        if last_completed:
+            print(f"이전 진행 상황 발견: {last_completed.strftime('%Y-%m')}까지 완료")
+            # 이전 달부터 시작
+            if last_completed.month == 1:
+                current_date = last_completed.replace(year=last_completed.year - 1, month=12)
+            else:
+                current_date = last_completed.replace(month=last_completed.month - 1)
+        else:
+            current_date = start_date
         
         with tqdm(desc="전체 진행률", unit="월") as pbar:
             while True:  # 무한 루프
@@ -142,7 +172,11 @@ class ArxivPaperDownloader:
                 print(f"총 다운로드: {self.total_downloaded}개")
                 print(f"총 실패: {self.total_errors}개")
                 
-                # 다음 달로 이동
+                # 현재 달이 성공적으로 완료되었을 때만 진행 상황 저장
+                if self.total_errors == 0:
+                    self.save_progress(current_date)
+                
+                # Move to previous month
                 if current_date.month == 1:
                     current_date = current_date.replace(year=current_date.year - 1, month=12)
                 else:
