@@ -79,6 +79,14 @@ class ArxivPaperDownloader:
             last_day = date.replace(month=date.month + 1, day=1) - timedelta(days=1)
         return first_day, last_day
     
+    def get_last_day_of_month(self, year, month):
+        if month in [4, 6, 9, 11]:
+            return 30
+        elif month == 2:
+            return 29 if year % 4 == 0 and (year % 100 != 0 or year % 400 == 0) else 28
+        else:
+            return 31
+
     def fetch_papers(self, start_date=None, batch_size=10000):
         if start_date is None:
             start_date = datetime(2024, 12, 31)
@@ -91,13 +99,7 @@ class ArxivPaperDownloader:
             if last_completed.month == 1:
                 current_date = last_completed.replace(year=last_completed.year - 1, month=12, day=31)
             else:
-                # 이전 달의 마지막 날 계산
-                if last_completed.month in [4, 6, 9, 11]:
-                    last_day = 30
-                elif last_completed.month == 2:
-                    last_day = 29 if last_completed.year % 4 == 0 and (last_completed.year % 100 != 0 or last_completed.year % 400 == 0) else 28
-                else:
-                    last_day = 31
+                last_day = self.get_last_day_of_month(last_completed.year, last_completed.month - 1)
                 current_date = last_completed.replace(month=last_completed.month - 1, day=last_day)
         else:
             current_date = start_date
@@ -187,13 +189,7 @@ class ArxivPaperDownloader:
                 if current_date.month == 1:
                     current_date = current_date.replace(year=current_date.year - 1, month=12, day=31)
                 else:
-                    # 이전 달의 마지막 날 계산
-                    if current_date.month in [4, 6, 9, 11]:
-                        last_day = 30
-                    elif current_date.month == 2:
-                        last_day = 29 if current_date.year % 4 == 0 and (current_date.year % 100 != 0 or current_date.year % 400 == 0) else 28
-                    else:
-                        last_day = 31
+                    last_day = self.get_last_day_of_month(current_date.year, current_date.month - 1)
                     current_date = current_date.replace(month=current_date.month - 1, day=last_day)
                 
                 pbar.update(1)
